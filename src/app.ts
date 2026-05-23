@@ -1,11 +1,10 @@
 import express from "express";
+import reconciliationRoutes from "./routes/reconciliation.routes";
 
 const app = express();
 
 app.use(express.json());
 
-app.get("/", (req, res) => {
-  res.send("Reconciliation Engine API");
-});
+app.use("/api", reconciliationRoutes);
 
 export default app;

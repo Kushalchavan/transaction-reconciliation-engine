@@ -1,6 +1,6 @@
-import Result from "../models/result.model.js";
-import Run from "../models/run.model.js";
-import { matchTransactions } from "../engines/matching.engine.js";
+import Result from "../models/result.model";
+import Run from "../models/run.model";
+import { matchTransactions } from "../engines/matching.engine";
 
 export const reconcileRun = async (
   runId: string,

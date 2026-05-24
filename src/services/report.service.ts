@@ -22,7 +22,6 @@ export const getSummary = async (runId: string) => {
 export const getUnmatched = async (runId: string) => {
   return Result.find({
     runId,
-
     category: {
       $in: ["UNMATCHED_USER", "UNMATCHED_EXCHANGE"],
     },

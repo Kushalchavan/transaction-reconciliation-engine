@@ -29,22 +29,26 @@ export const matchTransactions = async (
   const results = [];
 
   for (const userTx of userTransactions) {
-    let bestMatch = null;
+    let bestMatchedCandidate = null;
+    let bestConflictingCandidate = null;
 
-    // Find the best matching exchange transaction for this user transaction
     for (const exchangeTx of exchangeTransactions) {
+      // Prevent duplicate matching
       if (matchedExchangeIds.has(exchangeTx._id.toString())) {
         continue;
       }
 
+      // Asset matching
       if (userTx.normalizedAsset !== exchangeTx.normalizedAsset) {
         continue;
       }
 
+      // Type matching
       if (userTx.normalizedType !== exchangeTx.normalizedType) {
         continue;
       }
 
+      // Defensive checks
       if (userTx.quantity == null || exchangeTx.quantity == null) {
         continue;
       }
@@ -53,54 +57,104 @@ export const matchTransactions = async (
         continue;
       }
 
-      // calcualting quality
+      // Difference calculations
       const quantityDifferencePct = calculateQuantityDifferencePct(
         userTx.quantity,
         exchangeTx.quantity,
       );
 
-      // calculating timestamp difference 
       const timestampDifferenceSeconds = calculateTimestampDifferenceSeconds(
         userTx.timestamp,
         exchangeTx.timestamp,
       );
 
+      // Tolerance checks
       const quantityMatches = quantityDifferencePct <= quantityTolerancePct;
+
       const timestampMatches =
         timestampDifferenceSeconds <= timestampToleranceSeconds;
 
+      // PERFECT MATCH
       if (quantityMatches && timestampMatches) {
-        bestMatch = {
-          exchangeTx,
-          quantityDifferencePct,
-          timestampDifferenceSeconds,
-        };
-        break;
+        if (
+          !bestMatchedCandidate ||
+          timestampDifferenceSeconds <
+            bestMatchedCandidate.timestampDifferenceSeconds
+        ) {
+          bestMatchedCandidate = {
+            exchangeTx,
+            quantityDifferencePct,
+            timestampDifferenceSeconds,
+          };
+        }
+
+        continue;
+      }
+
+      // CONFLICTING MATCH
+      if (timestampMatches) {
+        if (
+          !bestConflictingCandidate ||
+          timestampDifferenceSeconds <
+            bestConflictingCandidate.timestampDifferenceSeconds
+        ) {
+          bestConflictingCandidate = {
+            exchangeTx,
+            quantityDifferencePct,
+            timestampDifferenceSeconds,
+          };
+        }
       }
     }
 
-    if (bestMatch) {
-      matchedExchangeIds.add(bestMatch.exchangeTx._id.toString());
+    // SAVE MATCHED RESULT
+    if (bestMatchedCandidate) {
+      matchedExchangeIds.add(bestMatchedCandidate.exchangeTx._id.toString());
 
       results.push({
         runId,
         userTransactionId: userTx._id,
-        exchangeTransactionId: bestMatch.exchangeTx._id,
+        exchangeTransactionId: bestMatchedCandidate.exchangeTx._id,
         category: "MATCHED",
         reason: "Matched within tolerance",
-        quantityDifferencePct: bestMatch.quantityDifferencePct,
-        timestampDifferenceSeconds: bestMatch.timestampDifferenceSeconds,
+        quantityDifferencePct: bestMatchedCandidate.quantityDifferencePct,
+        timestampDifferenceSeconds:
+          bestMatchedCandidate.timestampDifferenceSeconds,
       });
-    } else {
+
+      continue;
+    }
+
+    // SAVE CONFLICTING RESULT
+    if (bestConflictingCandidate) {
+      matchedExchangeIds.add(
+        bestConflictingCandidate.exchangeTx._id.toString(),
+      );
+
       results.push({
         runId,
         userTransactionId: userTx._id,
-        category: "UNMATCHED_USER",
-        reason: "No matching exchange transaction found",
+        exchangeTransactionId: bestConflictingCandidate.exchangeTx._id,
+        category: "CONFLICTING",
+        reason: "Transaction differs beyond tolerance",
+        quantityDifferencePct: bestConflictingCandidate.quantityDifferencePct,
+        timestampDifferenceSeconds:
+          bestConflictingCandidate.timestampDifferenceSeconds,
       });
+
+      continue;
     }
+
+    // UNMATCHED USER
+    results.push({
+      runId,
+      userTransactionId: userTx._id,
+      category: "UNMATCHED_USER",
+      reason: "No matching exchange transaction found",
+    });
   }
 
+  // UNMATCHED EXCHANGE
   for (const exchangeTx of exchangeTransactions) {
     if (matchedExchangeIds.has(exchangeTx._id.toString())) {
       continue;

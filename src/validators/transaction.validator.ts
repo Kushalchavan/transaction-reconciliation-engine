@@ -10,12 +10,12 @@ const transactionSchema = z.object({
     .refine((value) => !isNaN(new Date(value).getTime()), {
       message: "Invalid timestamp",
     }),
-
   type: z.string().min(1, "type is required"),
   asset: z.string().min(1, "asset is required"),
   quantity: z.coerce
-    .number({
-      invalid_type_error: "quantity must be number",
+    .number()
+    .refine((value) => !isNaN(value), {
+      message: "quantity must be number",
     })
     .positive("quantity must be positive"),
   price_usd: z.coerce.number(),

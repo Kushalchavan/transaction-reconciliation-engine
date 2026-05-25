@@ -2,6 +2,7 @@ import express from "express";
 import { reconcile } from "../controllers/reconciliation.controller";
 import { upload } from "../middlewares/upload.middleware";
 import {
+  fetchCsvReport,
   fetchReport,
   fetchSummary,
   fetchUnmatched,
@@ -26,5 +27,6 @@ router.post(
 router.get("/report/:runId", fetchReport);
 router.get("/report/:runId/summary", fetchSummary);
 router.get("/report/:runId/unmatched", fetchUnmatched);
+router.get("/report/:runId/export", fetchCsvReport);
 
 export default router;
